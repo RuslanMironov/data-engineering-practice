@@ -21,17 +21,20 @@ def check_directory(dir_name):
     os.chdir(dir_name)
 
 
-async def downloads_file(urls):
-    connector = aiohttp.TCPConnector(limit=50, force_close=True)
-    async with aiohttp.ClientSession(connector=connector) as session:
-        for url in urls:
-            filename = os.path.basename(url)
-            async with session.get(url, ssl=False) as response:
-                if response.status == 200:
-                    with open(filename, "wb") as file:
-                        file.write(await response.read())
-                else:
-                    print(f"Download failed: {os.path.basename(url)}")
+async def download_file(session, url):
+    filename = os.path.basename(url)
+    async with session.get(url, ssl=False) as response:
+        if response.status == 200:
+            with open(filename, "wb") as file:
+                file.write(await response.read())
+        else:
+            print(f"Download failed: {filename}")
+
+
+async def downloads_files(urls):
+    async with aiohttp.ClientSession(trust_env=True) as session:
+        tasks = [download_file(session, url) for url in urls]
+        await asyncio.gather(*tasks)
 
 
 async def unzip():
@@ -44,7 +47,7 @@ async def unzip():
 
 async def main():
     check_directory("downloads")
-    await downloads_file(download_uris)
+    await downloads_files(download_uris)
     await unzip()
 
 
