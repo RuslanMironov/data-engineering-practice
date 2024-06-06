@@ -1,33 +1,46 @@
 import os
+from concurrent.futures import ThreadPoolExecutor
 
+import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 
 urls = "https://www.ncei.noaa.gov/data/local-climatological-data/access/2024/"
+columns_name = "HourlyDryBulbTemperature"
 
 
-def url_check(url):
+def url_check(url) -> str | None:
     response = requests.get(url)
     soup = BeautifulSoup(response.content, "html.parser")
-    date_search = "2024-06-02 09:55"
+    date_search = "2024-06-05 20:15"
     for row in soup.find_all("tr"):
         if date_search in row.text:
             return url + row.find("a").text
+    return None
 
 
-def download_file(url):
-    filename = os.path.basename(url)
-    # response = requests.get(url)
-    with requests.get(url) as response:
-        if response.ok:
-            with open(filename, "wb") as file:
-                file.write(response.content)
-        else:
-            print(f"Download failed: {filename}")
+def download__read_file(url) -> pd.DataFrame:
+    try:
+        filename = os.path.basename(url)
+        with requests.get(url) as response:
+            if response.ok:
+                with open(filename, "wb") as file:
+                    file.write(response.content)
+                return pd.read_csv(filename)
+            else:
+                print(f"Download failed: {filename}")
+    except Exception as e:
+        print(e)
 
 
 def main():
-    download_file(url_check(urls))
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        urls_list = [urls]
+        future = list(executor.map(url_check, urls_list))
+        result = list(executor.map(download__read_file, future))
+
+        result_df = pd.concat(result, ignore_index=True)
+        print(result_df[columns_name].max())
 
 
 if __name__ == "__main__":
